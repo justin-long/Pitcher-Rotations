@@ -44,12 +44,16 @@ few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
 
 
 group_notcum = few_col.groupby(['YEAR_ID', 'PIT_ID','INN_CT']).sum()
-group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).sum().groupby(level=[0]).cumsum()
+group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).sum().groupby(level=[1]).cumsum()
 
-group3['cum_BB'] = group3.groupby(['YEAR_ID', 'PIT_ID'])['BB_SUM'].apply(lambda x: x.cumsum())
 
-group3['cum']
+group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).cumsum()
+list(group_cum)
 
+group_cum_final = group_cum.drop(['EVENT_CD', 'EVENT_RUNS_CT'], 1)
+group_cum_final_rename = group_cum_final.add_prefix('cum_')
+
+final = group_notcum.join(group_cum_final_rename)
 
 
 
