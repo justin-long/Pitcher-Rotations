@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 28 18:31:33 2018
+Created on Tue Apr 17 14:38:30 2018
 
 @author: jblon
 """
@@ -11,7 +11,7 @@ import numpy as np
 list_balls = ['B','H','I']
 list_strikes = ['B','C','F','H','I','L','M','N','O','P','S','T','V', 'X']
 
-events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/cle_2015_2016.csv')
+events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv')
 
 few_col = events[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX', 'EVENT_TX', 'EVENT_CD', 'BATTEDBALL_CD', 'EVENT_RUNS_CT']].copy()
 
@@ -42,7 +42,20 @@ few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
                           (few_col['BATTEDBALL_CD'] == 'P') , 1, 0)
 
 
-group1 = 
+
+group_notcum = few_col.groupby(['YEAR_ID', 'PIT_ID','INN_CT']).sum()
+group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).sum().groupby(level=[0]).cumsum()
+
+group3['cum_BB'] = group3.groupby(['YEAR_ID', 'PIT_ID'])['BB_SUM'].apply(lambda x: x.cumsum())
+
+group3['cum']
+
+
+
+
+group3 = few_col.groupby(['PIT_ID', 'YEAR_ID', ]).sum()
+
+group4 = group3.apply(lambda x: x.cumsum())
 
 
 #Group and sum, partition by year, pitcher, inning
