@@ -8,16 +8,30 @@ Created on Tue Apr 17 14:38:30 2018
 import pandas as pd
 import numpy as np
 
+pitcher = 'arrij001'
+
 list_balls = ['B','H','I']
 list_strikes = ['B','C','F','H','I','L','M','N','O','P','S','T','V', 'X']
 
 events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv')
 
-few_col = events[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX', 'EVENT_TX', 'EVENT_CD', 'BATTEDBALL_CD', 'EVENT_RUNS_CT']].copy()
+events_single=events[events['PIT_ID'] == pitcher]
+
+few_col = events_single[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX', 'EVENT_TX', 'EVENT_CD', 'BATTEDBALL_CD', 'EVENT_RUNS_CT']].copy()
 
 def batted_count(colname, event):
-    few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)
-
+    few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)    
+    
+def ind_ratio(event):
+    col_name = event + '_PER'
+    calc = event + '_SUM'
+    grouped[col_name] = grouped[calc] / grouped['BIP']
+    
+def cum_ratio(event):
+    col_name = 'CUM_' + event + '_PER'
+    calc = 'CUM_' + event + '_SUM'
+    grouped[col_name] = grouped[calc] / grouped['CUM_BIP']
+    
 #Number of walks
 temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'W'))
 temp.columns = ['BB_SUM']
@@ -46,33 +60,28 @@ few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
 group_notcum = few_col.groupby(['YEAR_ID', 'PIT_ID','INN_CT']).sum()
 group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).sum().groupby(level=[1]).cumsum()
 
-
-group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).cumsum()
-list(group_cum)
-
 group_cum_final = group_cum.drop(['EVENT_CD', 'EVENT_RUNS_CT'], 1)
-group_cum_final_rename = group_cum_final.add_prefix('cum_')
+group_cum_final_rename = group_cum_final.add_prefix('CUM_')
 
-final = group_notcum.join(group_cum_final_rename)
+grouped = group_notcum.join(group_cum_final_rename)
+grouped = grouped.reset_index(level = ['YEAR_ID', 'PIT_ID', 'INN_CT'])
+
+#Calculate ratios
+ind_ratio('GB')
+ind_ratio('FB')
+ind_ratio('LD')
+ind_ratio('PU')
+
+#Calculate cumulative ratios
+cum_ratio('GB')
+cum_ratio('FB')
+cum_ratio('LD')
+cum_ratio('PU')
 
 
 
-group3 = few_col.groupby(['PIT_ID', 'YEAR_ID', ]).sum()
 
-group4 = group3.apply(lambda x: x.cumsum())
-
-
-#Group and sum, partition by year, pitcher, inning
-grouped = few_col.groupby(['YEAR_ID','PIT_ID', 'INN_CT']).sum()
-
-grouped['GB_PER'] = grouped['GB_SUM'] / grouped['BIP']
-grouped['FB_PER'] = grouped['FB_SUM'] / grouped['BIP']
-grouped['LD_PER'] = grouped['LD_SUM'] / grouped['BIP']
-grouped['PU_PER'] = grouped['PU_SUM'] / grouped['BIP']
-
-grouped = grouped.reset_index(level = ['YEAR_ID', 'PIT_ID'])
-
-pitch_counts = few_col.groupby(['PIT_ID', 'YEAR_ID'])['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)\
+pitch_counts = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT'])['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)\
     .fillna(0).astype(int).reset_index()
 
 #Overall number of pitches
@@ -81,7 +90,7 @@ pitch_counts['PITCHES'] = pitch_counts[list_strikes].sum(axis=1) + pitch_counts[
 pitch_counts['BALLS_CT'] = pitch_counts[list_balls].sum(axis=1)
 #Number of strikes
 pitch_counts['STRIKES_CT'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT']
-#Number of balls hit into play
+#Number of balls hit into play, should match BIP column
 pitch_counts['INPLAY_CT'] = pitch_counts.X
 #Number of strikes without hit into play
 pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT'] 
