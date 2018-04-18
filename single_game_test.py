@@ -23,7 +23,6 @@ few_col = events_single[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX',
 def batted_count(colname, event):
     few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)    
 
-    
 def ind_ratio(event):
     col_name = event + '_PER'
     calc = event + '_SUM'
@@ -52,7 +51,7 @@ few_col = few_col.join(temp)
 #Number of plate appearances
 few_col['PA_CT'] = np.where(few_col['PA_NEW_FL'] == 'T', 1, 0)
 
-#Number of Strike Outs
+#Number of Strikeouts
 few_col['SO_CT'] = np.where(few_col['EVENT_CD'] == 3, 1, 0)
 
 #calculate different batted ball counts
@@ -68,14 +67,19 @@ few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
                           (few_col['BATTEDBALL_CD'] == 'P') , 1, 0)
 
 
-
+#Group bunch of stuff together, and sum, cumulative sum stuff
+#Initial grouping, first individual, second cumulative
 group_notcum = few_col.groupby(['YEAR_ID', 'PIT_ID','INN_CT']).sum()
 group_cum = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT']).sum().groupby(level=[1]).cumsum()
 
+#Drop some column, add prefix to cumulative columns
 group_cum_final = group_cum.drop(['EVENT_CD', 'EVENT_RUNS_CT'], 1)
 group_cum_final_rename = group_cum_final.add_prefix('CUM_')
 
+#Merge individual and grouped
 grouped = group_notcum.join(group_cum_final_rename)
+
+#Reset index
 grouped = grouped.reset_index(level = ['YEAR_ID', 'PIT_ID', 'INN_CT'])
 
 #Calculate ratios
@@ -110,11 +114,13 @@ pitch_counts['INPLAY_CT'] = pitch_counts.X
 #Number of strikes without hit into play
 pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT'] - pitch_counts['INPLAY_CT']
 
+
+#Merge other counts with pitch counts
 merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 
-
-SO_PA = 
-
+#Calculate SO/PA ratio
+merged['IND_SO_PA'] = merged['SO_CT'] / merged['PA_CT']
+merged['CUM_SO_PA'] = merged['CUM_SO_CT'] / merged['CUM_PA_CT']
 
 
 
