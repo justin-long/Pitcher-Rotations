@@ -105,10 +105,6 @@ merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 
 
 
-
-
-
-
 grouped['SIERA'] = 6.145 - 16.986*
                 
 grouped
