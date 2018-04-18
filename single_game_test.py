@@ -14,7 +14,6 @@ list_balls = ['B','H','I','N','P','V']
 list_strikes = ['B','C','F','K','L','M','O','Q','R','S','T','X', 'Y']
 
 
-
 events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv')
 
 events_single=events[events['PIT_ID'] == pitcher]
@@ -23,6 +22,7 @@ few_col = events_single[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX',
 
 def batted_count(colname, event):
     few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)    
+
     
 def ind_ratio(event):
     col_name = event + '_PER'
@@ -34,6 +34,16 @@ def cum_ratio(event):
     calc = 'CUM_' + event + '_SUM'
     grouped[col_name] = grouped[calc] / grouped['CUM_BIP']
     
+#Nunber of hit types
+few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0) 
+few_col['DOUBLE_CT'] = np.where(few_col['EVENT_CD'] == 21, 1, 0)
+few_col['TRIPLE_CT'] = np.where(few_col['EVENT_CD'] == 22, 1, 0)
+few_col['HR_CT'] = np.where(few_col['EVENT_CD'] == 23, 1, 0)
+
+#Number of hits
+few_col['HITS_CT'] = few_col['SINGLE_CT'] + few_col['DOUBLE_CT'] + few_col['TRIPLE_CT'] + few_col['HR_CT']
+
+
 #Number of walks
 temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'W'))
 temp.columns = ['BB_SUM']
@@ -103,7 +113,7 @@ pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BAL
 merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 
 
-
+SO_PA = 
 
 
 
