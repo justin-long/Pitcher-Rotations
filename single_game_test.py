@@ -10,8 +10,10 @@ import numpy as np
 
 pitcher = 'arrij001'
 
-list_balls = ['B','H','I']
-list_strikes = ['B','C','F','H','I','L','M','N','O','P','S','T','V', 'X']
+list_balls = ['B','H','I','N','P','V']
+list_strikes = ['B','C','F','K','L','M','O','Q','R','S','T','X', 'Y']
+
+
 
 events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv')
 
@@ -78,27 +80,29 @@ cum_ratio('FB')
 cum_ratio('LD')
 cum_ratio('PU')
 
-
-
-
+#Calculate pitch counts
 pitch_counts = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT'])['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)\
     .fillna(0).astype(int).reset_index()
 
-#Overall number of pitches
-pitch_counts['PITCHES'] = pitch_counts[list_strikes].sum(axis=1) + pitch_counts[list_balls].sum(axis=1)
+
 #Number of balls
-pitch_counts['BALLS_CT'] = pitch_counts[list_balls].sum(axis=1)
+pitch_counts['BALLS_CT'] = pitch_counts[pitch_counts.columns.intersection(list_balls)].sum(axis=1)
+
 #Number of strikes
-pitch_counts['STRIKES_CT'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT']
+pitch_counts['STRIKES_CT'] = pitch_counts[pitch_counts.columns.intersection(list_strikes)].sum(axis=1)
+
+#Overall number of pitches
+pitch_counts['PITCHES'] = pitch_counts['BALLS_CT'] + pitch_counts['STRIKES_CT']
+
 #Number of balls hit into play, should match BIP column
 pitch_counts['INPLAY_CT'] = pitch_counts.X
+
 #Number of strikes without hit into play
-pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT'] 
-- pitch_counts['INPLAY_CT']
+pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT'] - pitch_counts['INPLAY_CT']
 
-merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID'))
+merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 
-SO_PA = 
+
 
 
 
