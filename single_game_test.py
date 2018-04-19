@@ -150,6 +150,7 @@ merged['CUM_NEG_GB_PA'] = np.where(merged['CUM_GB_PA'] > 0, -merged['CUM_NEG_GB_
 #Calculate individual SIERA
 merged['IND_SIERA'] = 6.145 - 16.986*merged['IND_SO_PA'] + 11.434*merged['IND_BB_PA'] - 1.858*merged['IND_GB_PA'] + 7.653*(merged['IND_SO_PA'])**2 + 6.664 *merged['IND_NEG_GB_PA'] + 10.130*merged['IND_SO_PA']*merged['IND_GB_PA'] - 5.195*merged['IND_BB_PA']*merged['IND_GB_PA']
 
+
 #Calculate cumulative SIERA
 merged['CUM_SIERA'] = 6.145 - 16.986*merged['CUM_SO_PA'] + 11.434*merged['CUM_BB_PA'] - 1.858*merged['CUM_GB_PA'] + 7.653*(merged['CUM_SO_PA'])**2 + 6.664 *merged['CUM_NEG_GB_PA'] + 10.130*merged['CUM_SO_PA']*merged['CUM_GB_PA'] - 5.195*merged['CUM_BB_PA']*merged['CUM_GB_PA']
 
@@ -165,4 +166,5 @@ merged['IND_FIP'] = ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] + merged['HP_SUM'
 
 #Calculate cumulative FIP
 merged['CUM_FIP'] = ((13*merged['CUM_HR_CT'] + 3*(merged['CUM_BB_SUM'] + merged['CUM_HP_SUM']) - 2*merged['CUM_SO_CT']) / merged['CUM_IP']) + merged_FIP['cFIP']
+
 
