@@ -98,7 +98,6 @@ cum_ratio('PU')
 pitch_counts = few_col.groupby(['YEAR_ID', 'PIT_ID', 'INN_CT'])['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)\
     .fillna(0).astype(int).reset_index()
 
-
 #Number of balls
 pitch_counts['BALLS_CT'] = pitch_counts[pitch_counts.columns.intersection(list_balls)].sum(axis=1)
 
@@ -114,7 +113,6 @@ pitch_counts['INPLAY_CT'] = pitch_counts.X
 #Number of strikes without hit into play
 pitch_counts['STRIKES_CT_WO_PLAY'] = pitch_counts['PITCHES'] - pitch_counts['BALLS_CT'] - pitch_counts['INPLAY_CT']
 
-
 #Merge other counts with pitch counts
 merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 
@@ -122,10 +120,26 @@ merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'YEAR_ID', 'INN_CT'))
 merged['IND_SO_PA'] = merged['SO_CT'] / merged['PA_CT']
 merged['CUM_SO_PA'] = merged['CUM_SO_CT'] / merged['CUM_PA_CT']
 
+#Calculate BB/PA ratio
+merged['IND_BB_PA'] = merged['BB_SUM'] / merged['PA_CT']
+merged['CUM_BB_PA'] = merged['CUM_BB_SUM'] / merged['CUM_PA_CT']
 
+#Other ratio
+merged['IND_GB_PA'] = (merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) / merged['PA_CT']
+merged['CUM_GB_PA'] = (merged['CUM_GB_SUM'] - merged['CUM_FB_SUM'] - merged['CUM_PU_SUM']) / merged['CUM_PA_CT']
 
+#Other ratio opposite sign + squared
+merged['IND_NEG_GB_PA'] = ((merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) / merged['PA_CT'])**2
 
-grouped['SIERA'] = 6.145 - 16.986*
-                
-grouped
+merged['CUM_NEG_GB_PA'] = ((merged['CUM_GB_SUM'] - merged['CUM_FB_SUM'] - merged['CUM_PU_SUM']) / merged['CUM_PA_CT'])**2
+
+merged['IND_NEG_GB_PA'] = np.where(merged['IND_GB_PA'] > 0, -merged['IND_NEG_GB_PA'], merged['IND_NEG_GB_PA'])
+
+merged['CUM_NEG_GB_PA'] = np.where(merged['CUM_GB_PA'] > 0, -merged['CUM_NEG_GB_PA'], merged['CUM_NEG_GB_PA'])
+
+#Calculate individual SIERA
+merged['IND_SIERA'] = 6.145 - 16.986*merged['IND_SO_PA'] + 11.434*merged['IND_BB_PA'] - 1.858*merged['IND_GB_PA'] + 7.653*(merged['IND_SO_PA'])**2 + 6.664 *merged['IND_NEG_GB_PA'] + 10.130*merged['IND_SO_PA']*merged['IND_GB_PA'] - 5.195*merged['IND_BB_PA']*merged['IND_GB_PA']
+
+#Calculate cumulative SIERA
+merged['CUM_SIERA'] = 6.145 - 16.986*merged['CUM_SO_PA'] + 11.434*merged['CUM_BB_PA'] - 1.858*merged['CUM_GB_PA'] + 7.653*(merged['CUM_SO_PA'])**2 + 6.664 *merged['CUM_NEG_GB_PA'] + 10.130*merged['CUM_SO_PA']*merged['CUM_GB_PA'] - 5.195*merged['CUM_BB_PA']*merged['CUM_GB_PA']
 
