@@ -22,7 +22,7 @@ events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv
 
 events_single=events[events['PIT_ID'] == pitcher]
 
-few_col = events_single[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX', 'EVENT_TX', 'EVENT_CD', 'BATTEDBALL_CD', 'EVENT_RUNS_CT']].copy()
+few_col = events_single[['PIT_ID','INN_CT','YEAR_ID','PA_NEW_FL','PITCH_SEQ_TX', 'EVENT_TX', 'EVENT_CD', 'BATTEDBALL_CD', 'EVENT_RUNS_CT', 'EVENT_OUTS_CT']].copy()
 
 def batted_count(colname, event):
     few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)    
@@ -37,11 +37,12 @@ def cum_ratio(event):
     calc = 'CUM_' + event + '_SUM'
     grouped[col_name] = grouped[calc] / grouped['CUM_BIP']
     
-#Nunber of hit types
+#Number of hit types
 few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0) 
 few_col['DOUBLE_CT'] = np.where(few_col['EVENT_CD'] == 21, 1, 0)
 few_col['TRIPLE_CT'] = np.where(few_col['EVENT_CD'] == 22, 1, 0)
 few_col['HR_CT'] = np.where(few_col['EVENT_CD'] == 23, 1, 0)
+
 
 #Number of hits
 few_col['HITS_CT'] = few_col['SINGLE_CT'] + few_col['DOUBLE_CT'] + few_col['TRIPLE_CT'] + few_col['HR_CT']
@@ -50,6 +51,11 @@ few_col['HITS_CT'] = few_col['SINGLE_CT'] + few_col['DOUBLE_CT'] + few_col['TRIP
 #Number of walks
 temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'W'))
 temp.columns = ['BB_SUM']
+few_col = few_col.join(temp)
+
+#Number of HBP
+temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'HP'))
+temp.columns = ['HP_SUM']
 few_col = few_col.join(temp)
 
 #Number of plate appearances
@@ -150,21 +156,13 @@ merged['CUM_SIERA'] = 6.145 - 16.986*merged['CUM_SO_PA'] + 11.434*merged['CUM_BB
 #Merge for FIP constant
 merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
 
+#Calculate Innings Pitched
+merged['IND_IP'] = merged['EVENT_OUTS_CT'] / 3
+merged['CUM_IP'] = merged['CUM_EVENT_OUTS_CT'] / 3
 
+#Calculate FIP
+merged['IND_FIP'] = ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] + merged['HP_SUM']) - 2*merged['SO_CT']) / merged['IND_IP']) + merged_FIP['cFIP']
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#Calculate cumulative FIP
+merged['CUM_FIP'] = ((13*merged['CUM_HR_CT'] + 3*(merged['CUM_BB_SUM'] + merged['CUM_HP_SUM']) - 2*merged['CUM_SO_CT']) / merged['CUM_IP']) + merged_FIP['cFIP']
 
