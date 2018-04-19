@@ -13,6 +13,10 @@ pitcher = 'arrij001'
 list_balls = ['B','H','I','N','P','V']
 list_strikes = ['B','C','F','K','L','M','O','Q','R','S','T','X', 'Y']
 
+fip_constant = {'YEAR_ID' : [2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010, 2009, 2008, 2007, 2006, 2005, 2004, 2003, 2002, 2001, 2000], 'cFIP' : [3.107, 3.158, 3.147, 3.134, 3.132, 3.048, 3.095, 3.025, 3.079, 3.097, 3.132, 3.240, 3.147, 3.020, 3.049, 3.031, 2.962, 3.134, 3.049]}
+
+fip_constant = pd.DataFrame(data=fip_constant)
+
 
 events = pd.read_csv('C:/users/jblon/documents/Pitcher-Rotations/single_game.csv')
 
@@ -142,4 +146,25 @@ merged['IND_SIERA'] = 6.145 - 16.986*merged['IND_SO_PA'] + 11.434*merged['IND_BB
 
 #Calculate cumulative SIERA
 merged['CUM_SIERA'] = 6.145 - 16.986*merged['CUM_SO_PA'] + 11.434*merged['CUM_BB_PA'] - 1.858*merged['CUM_GB_PA'] + 7.653*(merged['CUM_SO_PA'])**2 + 6.664 *merged['CUM_NEG_GB_PA'] + 10.130*merged['CUM_SO_PA']*merged['CUM_GB_PA'] - 5.195*merged['CUM_BB_PA']*merged['CUM_GB_PA']
+
+#Merge for FIP constant
+merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
