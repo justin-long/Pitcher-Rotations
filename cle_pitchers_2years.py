@@ -36,6 +36,11 @@ def cum_ratio(event):
     col_name = 'CUM_' + event + '_PER'
     calc = 'CUM_' + event + '_SUM'
     grouped[col_name] = grouped[calc] / grouped['CUM_BIP']
+
+def SIERA(x,ind):
+    return  6.145 - 16.986*x[ind + '_SO_PA'] + 11.434*x[ind + '_BB_PA'] -\
+    1.858*x[ind + '_GB_PA'] + 7.653*(x[ind + '_SO_PA'])**2 + 6.664 *x[ind + '_NEG_GB_PA'] \
+    + 10.130*x[ind + '_SO_PA']*x[ind + '_GB_PA'] - 5.195*x[ind + '_BB_PA']*x[ind + '_GB_PA']
     
 #Number of hit types
 few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0) 
@@ -146,10 +151,10 @@ merged['IND_NEG_GB_PA'] = np.where(merged['IND_GB_PA'] > 0, -merged['IND_NEG_GB_
 merged['CUM_NEG_GB_PA'] = np.where(merged['CUM_GB_PA'] > 0, -merged['CUM_NEG_GB_PA'], merged['CUM_NEG_GB_PA'])
 
 #Calculate individual SIERA
-merged['IND_SIERA'] = 6.145 - 16.986*merged['IND_SO_PA'] + 11.434*merged['IND_BB_PA'] - 1.858*merged['IND_GB_PA'] + 7.653*(merged['IND_SO_PA'])**2 + 6.664 *merged['IND_NEG_GB_PA'] + 10.130*merged['IND_SO_PA']*merged['IND_GB_PA'] - 5.195*merged['IND_BB_PA']*merged['IND_GB_PA']
+merged['IND_SIERA'] = SIERA(merged,'IND')
 
 #Calculate cumulative SIERA
-merged['CUM_SIERA'] = 6.145 - 16.986*merged['CUM_SO_PA'] + 11.434*merged['CUM_BB_PA'] - 1.858*merged['CUM_GB_PA'] + 7.653*(merged['CUM_SO_PA'])**2 + 6.664 *merged['CUM_NEG_GB_PA'] + 10.130*merged['CUM_SO_PA']*merged['CUM_GB_PA'] - 5.195*merged['CUM_BB_PA']*merged['CUM_GB_PA']
+merged['CUM_SIERA'] = SIERA(merged,'CUM')
 
 #Merge for FIP constant
 merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
