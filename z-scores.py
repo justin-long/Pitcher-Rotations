@@ -21,7 +21,7 @@ list_balls = [
         'B', 'H', 'I', 'N', 'P', 'V'
         ]
 list_strikes = [
-        'B', 'C', 'F', 'K', 'L', 'M', 'O',
+        'C', 'F', 'K', 'L', 'M', 'O',
         'Q', 'R', 'S', 'T', 'X', 'Y'
         ]
 
@@ -194,6 +194,9 @@ merged['IND_NEG_GB_PA'] = np.where(
 # Calculate individual SIERA
 merged['IND_SIERA'] = SIERA(merged, 'IND')
 
+# Fix year_id
+merged['YEAR_ID'] = pd.to_numeric(merged.GAME_ID.str[3:7])
+
 # Merge for FIP constant
 merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
 
@@ -209,4 +212,6 @@ merged['IND_FIP'] = (
 # Drop some columns
 final_stats = merged.drop('EVENT_CD', 1)
 
-
+# Calculate Mean, St.Dev
+pit_mean = final_stats['IND_SIERA'].mean()
+pit_stdev = final_stats['IND_SIERA'].std()
