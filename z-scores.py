@@ -5,12 +5,6 @@ Created on Tue Apr 24 11:12:02 2018
 @author: jblon
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Apr 24 00:29:22 2018
-
-@author: jblon
-"""
 
 import pandas as pd
 import numpy as np

@@ -5,7 +5,7 @@ Created on Tue Apr 24 16:13:45 2018
 @author: jblon
 """
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtGui
 from test_ui import Ui_Siera
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.setupUi(self)
         self.show()
 
+        # connect spinboxes
         self.spinBox_BB.valueChanged.connect(self.siera_calc)
         # self.spinBox_Balls.valueChanged.connect(self.siera)
         self.spinBox_FB.valueChanged.connect(self.siera_calc)
@@ -27,6 +28,50 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.spinBox_PU.valueChanged.connect(self.siera_calc)
         self.spinBox_SO.valueChanged.connect(self.siera_calc)
 
+        # connect buttons to table
+        self.pushButton_SO.clicked.connect(self.add_table)
+        self.pushButton_Walk.clicked.connect(self.add_table)
+        self.pushButton_GB.clicked.connect(self.add_table)
+        self.pushButton_FB.clicked.connect(self.add_table)
+        self.pushButton_PU.clicked.connect(self.add_table)
+        self.pushButton_Other.clicked.connect(self.add_table)
+        self.pushButton_Delete.clicked.connect(self.remove_row)
+
+    def add_table(self):
+        button = self.sender()
+        row = self.spinBox_AB_TBL.value()
+
+        rowPosition = self.tableWidget_Events.rowCount()
+        self.tableWidget_Events.insertRow(rowPosition)
+        
+        self.tableWidget_Events.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem(str(row)))
+        self.tableWidget_Events.setItem(rowPosition, 1, QtWidgets.QTableWidgetItem(button.text()))
+
+        self.spinBox_AB_TBL.setValue(self.spinBox_AB_TBL.value() + 1)
+
+        self.dataframe_gen()
+
+    def remove_row(self):
+        selected = self.tableWidget_Events.currentRow()
+        self.tableWidget_Events.removeRow(selected)
+
+        self.dataframe_gen()
+
+    def dataframe_gen(self):
+        num_rows = self.tableWidget_Events.rowCount()
+        num_cols = self.tableWidget_Events.columnCount()
+
+        tmp_df = pd.DataFrame(
+            columns = ['At_Bat_Num', 'Event'], index=range(num_rows))
+        for i in range(num_rows):
+            for j in range(num_cols):
+                tmp_df.ix[i, j] = self.tableWidget_Events.item(i, j).text()
+        print(tmp_df)
+
+        self.num_Events = tmp_df['Event'].value_counts()
+
+        print(self.num_Events)
+        
     def siera_comp(pitcher, metric):
         list_balls = [
                 'B', 'H', 'I', 'N', 'P', 'V'
@@ -35,7 +80,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                 'C', 'F', 'K', 'L', 'M', 'O',
                 'Q', 'R', 'S', 'T', 'X', 'Y'
                 ]
-        
+
         fip_constant = {
                 'YEAR_ID': [
                         2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011,
@@ -47,39 +92,35 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                         3.025, 3.079, 3.097, 3.132, 3.240, 3.147, 3.020,
                         3.049, 3.031, 2.962, 3.134, 3.049
                         ]}
-        
+
         fip_constant = pd.DataFrame(data=fip_constant)
-        
-        
+
         events = pd.read_csv(
                 'C:/users/jblon/documents/Pitcher-Rotations/cle_2015_2016.csv'
                 )
-        
+
         events_single = events[events['PIT_ID'] == pitcher]
-        
+
         few_col = events_single[[
                 'PIT_ID', 'INN_CT', 'YEAR_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',
                 'EVENT_TX',  'EVENT_CD',  'BATTEDBALL_CD',  'EVENT_RUNS_CT',
                 'EVENT_OUTS_CT', 'GAME_ID'
                 ]].copy()
-        
-        
+
         def batted_count(colname, event):
-            few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)
-        
-        
+            few_col[colname] = np.where(
+                    few_col['BATTEDBALL_CD'] == event, 1, 0)
+
         def ind_ratio(event):
             col_name = event + '_PER'
             calc = event + '_SUM'
             grouped[col_name] = grouped[calc] / grouped['BIP']
-        
-        
+
         def cum_ratio(event):
             col_name = 'CUM_' + event + '_PER'
             calc = 'CUM_' + event + '_SUM'
             grouped[col_name] = grouped[calc] / grouped['CUM_BIP']
-        
-        
+
         def SIERA(x, ind):
             return(
                     6.145 - 16.986 * x[ind + '_SO_PA'] + 11.434 * x[ind + '_BB_PA'] -
@@ -87,8 +128,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                     6.664 * x[ind + '_NEG_GB_PA'] + 10.130 * x[ind + '_SO_PA'] *
                     x[ind + '_GB_PA'] - 5.195 * x[ind + '_BB_PA'] * x[ind + '_GB_PA']
                     )
-        
-        
+
+
         # Number of hit types
         few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0)
         few_col['DOUBLE_CT'] = np.where(few_col['EVENT_CD'] == 21, 1, 0)
@@ -253,9 +294,9 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                 10.130 * (SO_PA * GB_PA) - 5.195 * (BB_PA * GB_PA)
                 )
         SIERA_str = str(SIERA)
-        
+
         SIERA_Standard = (SIERA - mean) / stdev
         SIERA_Standard_str = str(SIERA_Standard)
-        
+
         self.label_SIERA.setText(SIERA_str)
         self.label_SIERA_STD.setText(SIERA_Standard_str)

@@ -70,6 +70,7 @@ def SIERA(x, ind):
             x[ind + '_GB_PA'] - 5.195 * x[ind + '_BB_PA'] * x[ind + '_GB_PA']
             )
 
+
 # Number of hit types
 few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0)
 few_col['DOUBLE_CT'] = np.where(few_col['EVENT_CD'] == 21, 1, 0)
