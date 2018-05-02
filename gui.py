@@ -9,7 +9,9 @@ from PyQt5 import QtWidgets, QtGui
 from test_ui import Ui_Siera
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
     def __init__(self):
@@ -18,15 +20,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.show()
 
         # connect spinboxes
-        self.spinBox_BB.valueChanged.connect(self.siera_calc)
-        # self.spinBox_Balls.valueChanged.connect(self.siera)
-        self.spinBox_FB.valueChanged.connect(self.siera_calc)
-        self.spinBox_GB.valueChanged.connect(self.siera_calc)
-        # self.spinBox_HR.valueChanged.connect(self.siera)
-        # self.spinBox_K.valueChanged.connect(self.siera)
-        self.spinBox_PA.valueChanged.connect(self.siera_calc)
-        self.spinBox_PU.valueChanged.connect(self.siera_calc)
-        self.spinBox_SO.valueChanged.connect(self.siera_calc)
+        self.spinBox_Balls.valueChanged.connect(self.num_pitches)
+        self.spinBox_K.valueChanged.connect(self.num_pitches)
 
         # connect buttons to table
         self.pushButton_SO.clicked.connect(self.add_table)
@@ -37,15 +32,29 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.pushButton_Other.clicked.connect(self.add_table)
         self.pushButton_Delete.clicked.connect(self.remove_row)
 
+        # initialize siera dataframe
+        self.siera_df = pd.DataFrame(columns=['At_Bat', 'Siera'])
+
+    def num_pitches(self):
+        self.num_Balls = self.spinBox_Balls.value()
+        self.num_Strikes = self.spinBox_K.value()
+
+        print(self.num_Balls)
+        print(self.num_Strikes)
+
+        self.num_pitches = self.num_Balls + self.num_Strikes
+
+        self.label_Num_pitches.setText(str(self.num_pitches))
+
     def add_table(self):
         button = self.sender()
-        row = self.spinBox_AB_TBL.value()
+        row = str(self.spinBox_AB_TBL.value()).zfill(2)
 
         rowPosition = self.tableWidget_Events.rowCount()
         self.tableWidget_Events.insertRow(rowPosition)
 
         self.tableWidget_Events.setItem(rowPosition, 0,
-                                        QtWidgets.QTableWidgetItem(str(row)))
+                                        QtWidgets.QTableWidgetItem((row)))
         self.tableWidget_Events.setItem(
                 rowPosition, 1, QtWidgets.QTableWidgetItem(button.text()))
 
@@ -56,6 +65,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
     def remove_row(self):
         selected = self.tableWidget_Events.currentRow()
         self.tableWidget_Events.removeRow(selected)
+
+        self.spinBox_AB_TBL.setValue(self.spinBox_AB_TBL.value() - 1)
 
         self.dataframe_gen()
 
@@ -68,7 +79,6 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         for i in range(num_rows):
             for j in range(num_cols):
                 tmp_df.ix[i, j] = self.tableWidget_Events.item(i, j).text()
-        print(tmp_df)
 
         self.num_SO = tmp_df.Event.str.count('Strikeout').sum()
         self.num_Walk = tmp_df.Event.str.count('Walk').sum()
@@ -87,12 +97,14 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.label_PU_ct.setText(str(self.num_PU))
         self.label_PA_ct.setText(str(self.num_PA))
 
+        self.siera_calc()
+
     def siera_calc(self):
-        SO_PA = self.spinBox_SO.value() / self.spinBox_PA.value()
-        BB_PA = self.spinBox_BB.value() / self.spinBox_PA.value()
-        GB_PA = (self.spinBox_GB.value() -
-                 self.spinBox_FB.value() -
-                 self.spinBox_PU.value()) / self.spinBox_PA.value()
+        SO_PA = self.num_SO / self.num_PA
+        BB_PA = self.num_Walk / self.num_PA
+        GB_PA = (self.num_GB -
+                 self.num_FB -
+                 self.num_PU) / self.num_PA
         GB_PA_SQ = GB_PA ** 2
         GB_PA_SQ_OPP = np.where(GB_PA > 0, -GB_PA_SQ, GB_PA_SQ)
 
@@ -104,13 +116,52 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                 7.653 * (SO_PA ** 2) + 6.664 * GB_PA_SQ_OPP +
                 10.130 * (SO_PA * GB_PA) - 5.195 * (BB_PA * GB_PA)
                 )
-        SIERA_str = str(SIERA)
+        SIERA_str = str("{0:.2f}".format(SIERA))
 
         SIERA_Standard = (SIERA - mean) / stdev
-        SIERA_Standard_str = str(SIERA_Standard)
+        SIERA_Standard_str = str("{0:.2f}".format(SIERA_Standard))
 
-        self.label_SIERA.setText(SIERA_str)
-        self.label_SIERA_STD.setText(SIERA_Standard_str)
+        self.label_Siera_ingame_2.setText(SIERA_str)
+        self.label_Siera_stand_2.setText(SIERA_Standard_str)
+
+        self.siera_data(self.num_PA, SIERA_Standard)
+
+    def siera_data(self, at_bat, siera):
+        self.df2 = pd.DataFrame([[at_bat, siera]], columns=['At_Bat', 'Siera'])
+        self.siera_df = self.siera_df.append(self.df2)
+
+        self.init_plot()
+
+    def init_plot(self):
+
+        if self.siera_df.At_Bat.max() <= 1:
+            plt.ion()
+
+            x = np.arange(0, 999, 0.1)
+
+            y1 = -5
+            y2 = .75
+            y3 = 2.25
+            y4 = 5
+
+            plt.fill_between(x, y1, y2, color='lawngreen', alpha='.6')
+            plt.fill_between(x, y2, y3, color='yellow', alpha='.6')
+            plt.fill_between(x, y3, y4, color='red', alpha='.6')
+
+            plt.scatter(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
+            plt.plot(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
+            plt.axhline(y=0, color='black')
+            plt.xticks(np.arange(0, 999))
+            plt.ylim([-4, 4])
+            plt.xlim([0, self.siera_df.At_Bat.max() + 1])
+            plt.draw()
+            plt.show()
+        else:
+            plt.scatter(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
+            plt.plot(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
+            plt.xlim([0, self.siera_df.At_Bat.max() + 1])
+            plt.draw()
+            plt.show()
 
     def siera_comp(pitcher, metric):
         list_balls = [
