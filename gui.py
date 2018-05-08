@@ -5,13 +5,12 @@ Created on Tue Apr 24 16:13:45 2018
 @author: jblon
 """
 
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtWidgets
 from test_ui import Ui_Siera
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+
 
 class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
     def __init__(self):
@@ -34,6 +33,29 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
 
         # initialize siera dataframe
         self.siera_df = pd.DataFrame(columns=['At_Bat', 'Siera'])
+
+        # create player name completer
+        file = 'C:/Users/jblon/Documents/pitcher-rotations/all_pitchers.csv'
+        self.all_pitchers = pd.read_csv(file)
+        pitchers_names = self.all_pitchers['full_name'].tolist()
+        completer = QtWidgets.QCompleter(pitchers_names, self.lineEdit_player)
+        completer.setCaseSensitivity(0)
+        self.lineEdit_player.setCompleter(completer)
+        self.lineEdit_player.show()
+
+        # connect button to pulling text
+        self.pushButton_player.clicked.connect(self.load_player)
+
+    def load_player(self):
+        self.player_name = self.lineEdit_player.text()
+        self.pit_id = self.all_pitchers.loc[(self.all_pitchers['full_name'] ==
+                                             self.player_name, 'ID')].item()
+
+        print(self.pit_id)
+
+        self.mean, self.stdev = self.siera_comp(self.pit_id)
+        print(self.mean)
+        print(self.stdev)
 
     def num_pitches(self):
         self.num_Balls = self.spinBox_Balls.value()
@@ -69,6 +91,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.spinBox_AB_TBL.setValue(self.spinBox_AB_TBL.value() - 1)
 
         self.dataframe_gen()
+
+        self.siera_delete()
 
     def dataframe_gen(self):
         num_rows = self.tableWidget_Events.rowCount()
@@ -133,7 +157,6 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.init_plot()
 
     def init_plot(self):
-
         if self.siera_df.At_Bat.max() <= 1:
             plt.ion()
 
@@ -143,27 +166,42 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
             y2 = .75
             y3 = 2.25
             y4 = 5
+            self.plotWidget.canvas.ax.fill_between(x, y1, y2,
+                                                   color='lawngreen',
+                                                   alpha='.6')
+            self.plotWidget.canvas.ax.fill_between(x, y2, y3,
+                                                   color='yellow',
+                                                   alpha='.6')
+            self.plotWidget.canvas.ax.fill_between(x, y3, y4,
+                                                   color='red',
+                                                   alpha='.6')
 
-            plt.fill_between(x, y1, y2, color='lawngreen', alpha='.6')
-            plt.fill_between(x, y2, y3, color='yellow', alpha='.6')
-            plt.fill_between(x, y3, y4, color='red', alpha='.6')
+            self.plotWidget.canvas.ax.scatter(self.siera_df.At_Bat,
+                                              self.siera_df.Siera, c='black')
+            self.plotWidget.canvas.ax.plot(self.siera_df.At_Bat,
+                                           self.siera_df.Siera, c='black')
 
-            plt.scatter(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
-            plt.plot(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
-            plt.axhline(y=0, color='black')
-            plt.xticks(np.arange(0, 999))
-            plt.ylim([-4, 4])
-            plt.xlim([0, self.siera_df.At_Bat.max() + 1])
-            plt.draw()
-            plt.show()
+            self.plotWidget.canvas.ax.axhline(y=0, color='black')
+            self.plotWidget.canvas.ax.set_xticks(np.arange(0, 999))
+            self.plotWidget.canvas.ax.set_ylim([-4, 4])
+            self.plotWidget.canvas.ax.set_xlim([0,
+                                                self.siera_df.At_Bat.max() +
+                                                1])
+
+            self.plotWidget.canvas.draw()
         else:
-            plt.scatter(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
-            plt.plot(self.siera_df.At_Bat, self.siera_df.Siera, c='black')
-            plt.xlim([0, self.siera_df.At_Bat.max() + 1])
-            plt.draw()
-            plt.show()
+            self.plotWidget.canvas.ax.scatter(self.siera_df.At_Bat,
+                                              self.siera_df.Siera, c='black')
+            self.plotWidget.canvas.ax.plot(self.siera_df.At_Bat,
+                                           self.siera_df.Siera, c='black')
 
-    def siera_comp(pitcher, metric):
+            self.plotWidget.canvas.ax.set_xlim([0,
+                                                self.siera_df.At_Bat.max() +
+                                                1])
+
+            self.plotWidget.canvas.draw()
+
+    def siera_comp(self, pitcher):
         list_balls = [
                 'B', 'H', 'I', 'N', 'P', 'V'
                 ]
@@ -176,27 +214,23 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                 'YEAR_ID': [
                         2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011,
                         2010, 2009, 2008, 2007, 2006, 2005, 2004, 2003,
-                        2002, 2001, 2000
-                        ],
+                        2002, 2001, 2000],
                 'cFIP': [
                         3.107, 3.158, 3.147, 3.134, 3.132, 3.048, 3.095,
                         3.025, 3.079, 3.097, 3.132, 3.240, 3.147, 3.020,
-                        3.049, 3.031, 2.962, 3.134, 3.049
-                        ]}
+                        3.049, 3.031, 2.962, 3.134, 3.049]}
 
         fip_constant = pd.DataFrame(data=fip_constant)
 
         events = pd.read_csv(
-                'C:/users/jblon/documents/Pitcher-Rotations/cle_2015_2016.csv'
-                )
+                'C:/users/jblon/documents/Pitcher-Rotations/events_2015_2.csv')
 
         events_single = events[events['PIT_ID'] == pitcher]
 
         few_col = events_single[[
                 'PIT_ID', 'INN_CT', 'YEAR_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',
                 'EVENT_TX',  'EVENT_CD',  'BATTEDBALL_CD',  'EVENT_RUNS_CT',
-                'EVENT_OUTS_CT', 'GAME_ID'
-                ]].copy()
+                'EVENT_OUTS_CT', 'GAME_ID']].copy()
 
         def batted_count(colname, event):
             few_col[colname] = np.where(
@@ -220,8 +254,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
                     7.653*(x[ind + '_SO_PA'])**2 +
                     6.664 * x[ind + '_NEG_GB_PA'] +
                     10.130 * x[ind + '_SO_PA'] * x[ind + '_GB_PA'] -
-                    5.195 * x[ind + '_BB_PA'] * x[ind + '_GB_PA']
-                    )
+                    5.195 * x[ind + '_BB_PA'] * x[ind + '_GB_PA'])
 
         # Number of hit types
         few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0)
@@ -232,8 +265,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         # Number of hits
         few_col['HITS_CT'] = (
                 few_col['SINGLE_CT'] + few_col['DOUBLE_CT'] +
-                few_col['TRIPLE_CT'] + few_col['HR_CT']
-                )
+                few_col['TRIPLE_CT'] + few_col['HR_CT'])
 
         # Number of walks
         temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'W'))
@@ -280,25 +312,21 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         pitch_counts = (
                 few_col.groupby(['GAME_ID', 'PIT_ID'])
                 ['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)
-                .fillna(0).astype(int).reset_index()
-                )
+                .fillna(0).astype(int).reset_index())
 
         # Number of balls
         pitch_counts['BALLS_CT'] = (
                 pitch_counts[(pitch_counts.columns.
-                              intersection(list_balls))].sum(axis=1)
-                )
+                              intersection(list_balls))].sum(axis=1))
 
         # Number of strikes
         pitch_counts['STRIKES_CT'] = (
                 pitch_counts[pitch_counts.columns.intersection(list_strikes)]
-                .sum(axis=1)
-                )
+                .sum(axis=1))
 
         # Overall number of pitches
         pitch_counts['PITCHES'] = (
-                pitch_counts['BALLS_CT'] + pitch_counts['STRIKES_CT']
-                )
+                pitch_counts['BALLS_CT'] + pitch_counts['STRIKES_CT'])
 
         # Number of balls hit into play, should match BIP column
         pitch_counts['INPLAY_CT'] = pitch_counts.X
@@ -307,8 +335,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         pitch_counts['STRIKES_CT_WO_PLAY'] = (
                 pitch_counts['PITCHES'] -
                 pitch_counts['BALLS_CT'] -
-                pitch_counts['INPLAY_CT']
-                )
+                pitch_counts['INPLAY_CT'])
 
         # Merge other counts with pitch counts
         merged = pd.merge(grouped, pitch_counts, on=('GAME_ID', 'PIT_ID'))
@@ -322,20 +349,17 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         # Other ratio
         merged['IND_GB_PA'] = (
                 (merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) /
-                merged['PA_CT']
-                )
+                merged['PA_CT'])
 
         # Other ratio opposite sign + squared
         merged['IND_NEG_GB_PA'] = (
                 ((merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) /
-                 merged['PA_CT'])**2
-                 )
+                 merged['PA_CT'])**2)
 
         merged['IND_NEG_GB_PA'] = np.where(
                 merged['IND_GB_PA'] > 0,
                 -merged['IND_NEG_GB_PA'],
-                merged['IND_NEG_GB_PA']
-                )
+                merged['IND_NEG_GB_PA'])
 
         # Calculate individual SIERA
         merged['IND_SIERA'] = SIERA(merged, 'IND')
@@ -353,8 +377,7 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         merged['IND_FIP'] = (
                 ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] +
                   merged['HP_SUM']) - 2*merged['SO_CT']) / (merged['IND_IP']) +
-                  merged_FIP['cFIP'])
-                )
+                    merged_FIP['cFIP']))
 
         # Drop some columns
         final_stats = merged.drop('EVENT_CD', 1)
@@ -363,10 +386,4 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         pit_mean = final_stats['IND_SIERA'].mean()
         pit_stdev = final_stats['IND_SIERA'].std()
 
-        if metric == 'mean':
-            return pit_mean
-        if metric == 'stdev':
-            return pit_stdev
-
-    mean = siera_comp('klubc001', 'mean')
-    stdev = siera_comp('klubc001', 'stdev')
+        return pit_mean, pit_stdev
