@@ -53,16 +53,21 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
 
         print(self.pit_id)
 
-        self.mean, self.stdev = self.siera_comp(self.pit_id)
+        self.year_start = self.spinBox_start_year.value()
+        self.year_end = self.spinBox_end_year.value()
+
+        print(self.year_start)
+        print(self.year_end)
+
+        self.mean, self.stdev = self.siera_comp(self.pit_id,
+                                                self.year_start,
+                                                self.year_end)
         print(self.mean)
         print(self.stdev)
 
     def num_pitches(self):
         self.num_Balls = self.spinBox_Balls.value()
         self.num_Strikes = self.spinBox_K.value()
-
-        print(self.num_Balls)
-        print(self.num_Strikes)
 
         self.num_pitches = self.num_Balls + self.num_Strikes
 
@@ -201,7 +206,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
 
             self.plotWidget.canvas.draw()
 
-    def siera_comp(self, pitcher):
+    def siera_comp(self, pitcher, year_start, year_end):
+        print('standardization')
         list_balls = [
                 'B', 'H', 'I', 'N', 'P', 'V'
                 ]
@@ -225,7 +231,9 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         events = pd.read_csv(
                 'C:/users/jblon/documents/Pitcher-Rotations/events_2015_2.csv')
 
-        events_single = events[events['PIT_ID'] == pitcher]
+        events_single = events[(events['PIT_ID'] == pitcher) &
+                               (year_start <= events['YEAR_ID']) &
+                               (events['YEAR_ID'] <= year_end)]
 
         few_col = events_single[[
                 'PIT_ID', 'INN_CT', 'YEAR_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',

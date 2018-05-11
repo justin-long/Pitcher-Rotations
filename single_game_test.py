@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 
 pitcher = 'arrij001'
+year_start = 2015
+year_end = 2015
 
 list_balls = ['B', 'H', 'I',
               'N', 'P', 'V']
@@ -26,10 +28,10 @@ fip_constant = {'YEAR_ID': [2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011,
 fip_constant = pd.DataFrame(data=fip_constant)
 
 events = pd.read_csv(
-        'C:/users/jblon/documents/Pitcher-Rotations/single_game.csv'
+        'C:/users/jblon/documents/Pitcher-Rotations/events_2015_2.csv'
         )
 
-events_single = events[events['PIT_ID'] == pitcher]
+events_single = events[(events['PIT_ID'] == pitcher) & (year_start <= events['YEAR_ID']) & (events['YEAR_ID'] <= year_end)]
 
 few_col = events_single[[
         'PIT_ID', 'INN_CT', 'YEAR_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',
