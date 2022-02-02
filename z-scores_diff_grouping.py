@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Thu Oct 18 02:16:03 2018
+
+@author: jblon
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Apr 24 11:12:02 2018
 
 @author: jblon
@@ -46,6 +53,8 @@ few_col = events_single[[
         'EVENT_OUTS_CT'
         ]].copy()
 
+few_col['AT_BAT'] = few_col.groupby(['GAME_ID', 'PIT_ID']).cumcount() + 1
+
 def batted_count(colname, event):
     few_col[colname] = np.where(few_col['BATTEDBALL_CD'] == event, 1, 0)
 
@@ -70,6 +79,8 @@ def SIERA(x, ind):
             x[ind + '_GB_PA'] - 5.195 * x[ind + '_BB_PA'] * x[ind + '_GB_PA']
             )
 
+# Get number of pitches thrown per at bat
+few_col['PITCH_CT'] = few_col['PITCH_SEQ_TX'].str.len()
 
 # Number of hit types
 few_col['SINGLE_CT'] = np.where(few_col['EVENT_CD'] == 20, 1, 0)
@@ -113,12 +124,14 @@ few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
 
 # Group bunch of stuff together
 # Initial grouping, first individual
-grouped = few_col.groupby(['GAME_ID', 'PIT_ID']).sum()
-grouped_avg = few_col.groupby(['PIT_ID']).mean()
-grouped_dev = few_col.groupby(['PIT_ID']).std()
+"""
+This is where the program starts to differ
+"""
 
-# Reset index
-grouped = grouped.reset_index(level=['GAME_ID', 'PIT_ID'])
+grouped = (
+        few_col.set_index(['GAME_ID', 'PIT_ID','AT_BAT','YEAR_ID'])
+        .groupby(level=[0,1]).cumsum().reset_index()
+    )
 
 # Calculate ratios
 ind_ratio('GB')
@@ -128,7 +141,7 @@ ind_ratio('PU')
 
 # Calculate pitch counts
 pitch_counts = (
-        few_col.groupby(['GAME_ID', 'PIT_ID'])
+        few_col.groupby(['PIT_ID', 'AT_BAT'])
         ['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)
         .fillna(0).astype(int).reset_index()
         )
@@ -158,7 +171,7 @@ pitch_counts['STRIKES_CT_WO_PLAY'] = (
         )
 
 # Merge other counts with pitch counts
-merged = pd.merge(grouped, pitch_counts, on=('GAME_ID', 'PIT_ID'))
+merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'AT_BAT'))
 
 # Calculate SO/PA ratio
 merged['IND_SO_PA'] = merged['SO_CT'] / merged['PA_CT']
@@ -187,24 +200,62 @@ merged['IND_NEG_GB_PA'] = np.where(
 # Calculate individual SIERA
 merged['IND_SIERA'] = SIERA(merged, 'IND')
 
-# Fix year_id
-merged['YEAR_ID'] = pd.to_numeric(merged.GAME_ID.str[3:7])
+final_stats = merged[['PIT_ID', 'AT_BAT', 'IND_SIERA']].copy()
 
-# Merge for FIP constant
-merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
+pit_mean = final_stats.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).mean()
+pit_mean = pit_mean.reset_index()
+pit_mean = pit_mean.set_index('AT_BAT')
+pit_mean = pit_mean.rename(columns = {'IND_SIERA':'SIERA_MEAN'})
 
-# Calculate Innings Pitched
-merged['IND_IP'] = merged['EVENT_OUTS_CT'] / 3
+pit_std = final_stats.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).std()
+pit_std = pit_std.reset_index()
+pit_std = pit_std.set_index('AT_BAT')
+pit_std = pit_std.rename(columns = {'IND_SIERA':'SIERA_STD'})
+pit_std = pit_std.fillna(method='ffill')
 
-# Calculate FIP
-merged['IND_FIP'] = (
-        ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] + merged['HP_SUM']) -
-          2*merged['SO_CT']) / merged['IND_IP']) + merged_FIP['cFIP']
-        )
+pit_mean_std = pd.concat([pit_mean, pit_std], axis=1)
+pit_mean_std['AT_BAT'] = pit_mean_std.index
 
-# Drop some columns
-final_stats = merged.drop('EVENT_CD', 1)
+at_bat_1 = final_stats[final_stats['AT_BAT'] == 10]
 
-# Calculate Mean, St.Dev
-pit_mean = final_stats['IND_SIERA'].mean()
-pit_stdev = final_stats['IND_SIERA'].std()
+test = merged[['PIT_ID', 'AT_BAT', 'IND_SIERA']].copy()
+
+
+size = 1        # sample size
+replace = True  # with replacement
+fn = lambda obj: obj.loc[np.random.choice(obj.index, size, replace),:]
+test2 = test.groupby('AT_BAT', as_index=False).apply(fn)
+test2 = test2.reset_index()
+
+test2 = test2.drop(['level_0', 'level_1'], axis = 1)
+
+pit_mean = test.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).mean()
+pit_mean = pit_mean.reset_index()
+pit_mean = pit_mean.rename(columns = {'IND_SIERA':'SIERA_MEAN'})
+pit_std = test.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).std()
+pit_std = pit_std.reset_index()
+pit_std = pit_std.rename(columns = {'IND_SIERA':'SIERA_STD'})
+pit_std = pit_std.fillna(method='ffill')
+#
+#
+## Fix year_id
+#merged['YEAR_ID'] = pd.to_numeric(merged.GAME_ID.str[3:7])
+#
+## Merge for FIP constant
+#merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
+#
+## Calculate Innings Pitched
+#merged['IND_IP'] = merged['EVENT_OUTS_CT'] / 3
+#
+## Calculate FIP
+#merged['IND_FIP'] = (
+#        ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] + merged['HP_SUM']) -
+#          2*merged['SO_CT']) / merged['IND_IP']) + merged_FIP['cFIP']
+#        )
+#
+## Drop some columns
+#final_stats = merged.drop('EVENT_CD', 1)
+#
+## Calculate Mean, St.Dev
+#pit_mean = final_stats['IND_SIERA'].mean()
+#pit_stdev = final_stats['IND_SIERA'].std()

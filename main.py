@@ -7,3 +7,4 @@ app = QApplication(sys.argv)
 gui = SieraWindow()
 
 sys.exit(app.exec_())
+

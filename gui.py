@@ -32,7 +32,8 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.pushButton_Delete.clicked.connect(self.remove_row)
 
         # initialize siera dataframe
-        self.siera_df = pd.DataFrame(columns=['At_Bat', 'Siera'])
+        self.siera_df = pd.DataFrame(columns=['AT_BAT', 'SIERA'])
+        self.siera_stand = pd.DataFrame(columns=['AT_BAT', 'SIERA', 'PIT_ID', 'SIERA_MEAN', 'SIERA_STD', 'Z'])
 
         # create player name completer
         file = 'C:/Users/jblon/Documents/pitcher-rotations/all_pitchers.csv'
@@ -51,19 +52,15 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         self.pit_id = self.all_pitchers.loc[(self.all_pitchers['full_name'] ==
                                              self.player_name, 'ID')].item()
 
-        print(self.pit_id)
 
         self.year_start = self.spinBox_start_year.value()
         self.year_end = self.spinBox_end_year.value()
 
-        print(self.year_start)
-        print(self.year_end)
-
-        self.mean, self.stdev = self.siera_comp(self.pit_id,
-                                                self.year_start,
-                                                self.year_end)
-        print(self.mean)
-        print(self.stdev)
+        self.pit_mean_std = self.siera_comp(self.pit_id,
+                                         self.year_start,
+                                         self.year_end) 
+                
+        self.init_plot('init')
 
     def num_pitches(self):
         self.num_Balls = self.spinBox_Balls.value()
@@ -137,77 +134,112 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         GB_PA_SQ = GB_PA ** 2
         GB_PA_SQ_OPP = np.where(GB_PA > 0, -GB_PA_SQ, GB_PA_SQ)
 
-        mean = self.mean
-        stdev = self.stdev
-
         SIERA = (
                 6.145 - 16.986 * SO_PA + 11.434 * BB_PA - 1.858 * GB_PA +
                 7.653 * (SO_PA ** 2) + 6.664 * GB_PA_SQ_OPP +
                 10.130 * (SO_PA * GB_PA) - 5.195 * (BB_PA * GB_PA)
                 )
         SIERA_str = str("{0:.2f}".format(SIERA))
-
-        SIERA_Standard = (SIERA - mean) / stdev
-        SIERA_Standard_str = str("{0:.2f}".format(SIERA_Standard))
-
         self.label_Siera_ingame_2.setText(SIERA_str)
+
+
+        self.siera_data(self.num_PA, SIERA)
+
+    def siera_data(self, at_bat, siera):  
+        # Temp dataset for current, live, SIERA
+        self.df2 = pd.DataFrame([[at_bat, siera]], columns=['AT_BAT', 'SIERA'])
+        
+        # Temp dataset for historical SIERA
+        self.df3 = self.pit_mean_std[at_bat - 1 : at_bat]
+        
+        # Set indexes for concatenation
+        self.df2 = self.df2.set_index('AT_BAT')
+        self.df3 = self.df3.set_index('AT_BAT')
+        
+        # Concatentate dataframes
+        self.df4 = pd.concat([self.df2, self.df3], axis = 1)
+        
+        # Calculate standardized Z statistics, reset index
+        self.df4['Z'] = (self.df4['SIERA'] - self.df4['SIERA_MEAN']) / self.df4['SIERA_STD']
+        
+        # Pull out specific z-score
+        SIERA_Standard = self.df4.at[at_bat, 'Z']
+        SIERA_Standard_str = str("{0:.2f}".format(SIERA_Standard))
         self.label_Siera_stand_2.setText(SIERA_Standard_str)
-
-        self.siera_data(self.num_PA, SIERA_Standard)
-
-    def siera_data(self, at_bat, siera):
-        self.df2 = pd.DataFrame([[at_bat, siera]], columns=['At_Bat', 'Siera'])
-        self.siera_df = self.siera_df.append(self.df2)
-
-        self.init_plot()
-
-    def init_plot(self):
-        if self.siera_df.At_Bat.max() <= 1:
-            plt.ion()
-
-            x = np.arange(0, 999, 0.1)
-
-            y1 = -5
-            y2 = .75
-            y3 = 2.25
-            y4 = 5
-            self.plotWidget.canvas.ax.fill_between(x, y1, y2,
-                                                   color='lawngreen',
-                                                   alpha='.6')
-            self.plotWidget.canvas.ax.fill_between(x, y2, y3,
-                                                   color='yellow',
-                                                   alpha='.6')
-            self.plotWidget.canvas.ax.fill_between(x, y3, y4,
-                                                   color='red',
-                                                   alpha='.6')
-
-            self.plotWidget.canvas.ax.scatter(self.siera_df.At_Bat,
-                                              self.siera_df.Siera, c='black')
-            self.plotWidget.canvas.ax.plot(self.siera_df.At_Bat,
-                                           self.siera_df.Siera, c='black')
-
+        
+        self.df4 = self.df4.reset_index()
+        
+        # Append to dataframe
+        self.siera_stand = self.siera_stand.append(self.df4)
+        print(self.siera_stand)
+        
+        self.init_plot('update')
+        
+        
+        
+    def init_plot(self, init_plot):
+        print('plot')
+        if init_plot == 'init':
+            plt.ion()            
+            
+            x = np.arange(0, 100, 1)
+            
+            lower_bound = 1
+            middle_bound = 2
+            upper_bound = 20
+            yaxis_bound =  4
+            init_xbound = 10
+            
+            self.plotWidget.canvas.ax.fill_between(
+                    x, 
+                    lower_bound * self.pit_mean_std['SIERA_STD'], 
+                    -5, 
+                    color='lawngreen', alpha='.75'
+                    )
+            self.plotWidget.canvas.ax.fill_between(
+                    x, 
+                    middle_bound * self.pit_mean_std['SIERA_STD'], 
+                    lower_bound * self.pit_mean_std['SIERA_STD'], 
+                    color='yellow', alpha='.75'
+                    )
+            self.plotWidget.canvas.ax.fill_between(
+                    x, 
+                    upper_bound * self.pit_mean_std['SIERA_STD'], 
+                    middle_bound * self.pit_mean_std['SIERA_STD'], 
+                    color='red', alpha='.75'
+                    )
+            self.plotWidget.canvas.ax.set_ylim([-1 * yaxis_bound, yaxis_bound])
+            self.plotWidget.canvas.ax.set_xlim([0, init_xbound])
             self.plotWidget.canvas.ax.axhline(y=0, color='black')
-            self.plotWidget.canvas.ax.set_xticks(np.arange(0, 999))
-            self.plotWidget.canvas.ax.set_ylim([-4, 4])
-            self.plotWidget.canvas.ax.set_xlim([0,
-                                                self.siera_df.At_Bat.max() +
-                                                1])
-
+            
             self.plotWidget.canvas.draw()
         else:
-            self.plotWidget.canvas.ax.scatter(self.siera_df.At_Bat,
-                                              self.siera_df.Siera, c='black')
-            self.plotWidget.canvas.ax.plot(self.siera_df.At_Bat,
-                                           self.siera_df.Siera, c='black')
+            # Shold match above
+            yaxis_bound =  4
+            
+            if self.siera_stand['AT_BAT'].max() >= 10:
+                xbound = self.siera_stand['AT_BAT'].max() + 1
+            else:
+                xbound = 10
+                
+            if self.siera_stand['Z'].max() >= yaxis_bound:
+                ybound = int(self.siera_stand['Z'].max()) + 1
+            else:
+                ybound = yaxis_bound
+                
+            
+            self.plotWidget.canvas.ax.scatter(self.siera_stand['AT_BAT'],
+                                              self.siera_stand['Z'], c='black')
+            self.plotWidget.canvas.ax.plot(self.siera_stand['AT_BAT'],
+                                           self.siera_stand['Z'], c='black')
 
-            self.plotWidget.canvas.ax.set_xlim([0,
-                                                self.siera_df.At_Bat.max() +
-                                                1])
+            self.plotWidget.canvas.ax.set_xlim([0, xbound])
+            self.plotWidget.canvas.ax.set_ylim([-1 * yaxis_bound, ybound])
+
 
             self.plotWidget.canvas.draw()
 
     def siera_comp(self, pitcher, year_start, year_end):
-        print('standardization')
         list_balls = [
                 'B', 'H', 'I', 'N', 'P', 'V'
                 ]
@@ -233,12 +265,15 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
 
         events_single = events[(events['PIT_ID'] == pitcher) &
                                (year_start <= events['YEAR_ID']) &
-                               (events['YEAR_ID'] <= year_end)]
-
+                               (events['YEAR_ID'] <= year_end)]        
+        
         few_col = events_single[[
-                'PIT_ID', 'INN_CT', 'YEAR_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',
-                'EVENT_TX',  'EVENT_CD',  'BATTEDBALL_CD',  'EVENT_RUNS_CT',
-                'EVENT_OUTS_CT', 'GAME_ID']].copy()
+        'GAME_ID', 'YEAR_ID', 'INN_CT', 'PIT_ID', 'PA_NEW_FL', 'PITCH_SEQ_TX',
+        'EVENT_TX',  'EVENT_CD',  'BATTEDBALL_CD',  'EVENT_RUNS_CT',
+        'EVENT_OUTS_CT'
+        ]].copy()
+
+        few_col['AT_BAT'] = few_col.groupby(['GAME_ID', 'PIT_ID']).cumcount() + 1
 
         def batted_count(colname, event):
             few_col[colname] = np.where(
@@ -269,129 +304,144 @@ class SieraWindow(QtWidgets.QMainWindow, Ui_Siera):
         few_col['DOUBLE_CT'] = np.where(few_col['EVENT_CD'] == 21, 1, 0)
         few_col['TRIPLE_CT'] = np.where(few_col['EVENT_CD'] == 22, 1, 0)
         few_col['HR_CT'] = np.where(few_col['EVENT_CD'] == 23, 1, 0)
-
+        
         # Number of hits
         few_col['HITS_CT'] = (
                 few_col['SINGLE_CT'] + few_col['DOUBLE_CT'] +
-                few_col['TRIPLE_CT'] + few_col['HR_CT'])
-
+                few_col['TRIPLE_CT'] + few_col['HR_CT']
+                )
+        
         # Number of walks
         temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'W'))
         temp.columns = ['BB_SUM']
         few_col = few_col.join(temp)
-
+        
         # Number of HBP
         temp = few_col[['EVENT_TX']].applymap(lambda x: str.count(x, 'HP'))
         temp.columns = ['HP_SUM']
         few_col = few_col.join(temp)
-
+        
         # Number of plate appearances
         few_col['PA_CT'] = np.where(few_col['PA_NEW_FL'] == 'T', 1, 0)
-
+        
         # Number of Strikeouts
         few_col['SO_CT'] = np.where(few_col['EVENT_CD'] == 3, 1, 0)
-
+        
         # calculate different batted ball counts
         batted_count('GB_SUM', 'G')
         batted_count('FB_SUM', 'F')
         batted_count('LD_SUM', 'L')
         batted_count('PU_SUM', 'P')
-
+        
         # calculate number of balls in play
         few_col['BIP'] = np.where((few_col['BATTEDBALL_CD'] == 'G') |
                                   (few_col['BATTEDBALL_CD'] == 'F') |
                                   (few_col['BATTEDBALL_CD'] == 'L') |
                                   (few_col['BATTEDBALL_CD'] == 'P'), 1, 0)
-
+        
         # Group bunch of stuff together
         # Initial grouping, first individual
-        grouped = few_col.groupby(['GAME_ID', 'PIT_ID']).sum()
-
-        # Reset index
-        grouped = grouped.reset_index(level=['GAME_ID', 'PIT_ID'])
-
+        """
+        This is where the program starts to differ
+        """
+        
+        grouped = (
+                few_col.set_index(['GAME_ID', 'PIT_ID','AT_BAT','YEAR_ID'])
+                .groupby(level=[0,1]).cumsum().reset_index()
+            )
+        
         # Calculate ratios
         ind_ratio('GB')
         ind_ratio('FB')
         ind_ratio('LD')
         ind_ratio('PU')
-
+        
         # Calculate pitch counts
         pitch_counts = (
-                few_col.groupby(['GAME_ID', 'PIT_ID'])
+                few_col.groupby(['PIT_ID', 'AT_BAT'])
                 ['PITCH_SEQ_TX'].sum().map(list).apply(pd.value_counts)
-                .fillna(0).astype(int).reset_index())
-
+                .fillna(0).astype(int).reset_index()
+                )
+        
         # Number of balls
         pitch_counts['BALLS_CT'] = (
-                pitch_counts[(pitch_counts.columns.
-                              intersection(list_balls))].sum(axis=1))
-
+                pitch_counts[pitch_counts.columns.intersection(list_balls)].sum(axis=1)
+                )
+        
         # Number of strikes
         pitch_counts['STRIKES_CT'] = (
                 pitch_counts[pitch_counts.columns.intersection(list_strikes)]
-                .sum(axis=1))
-
+                .sum(axis=1)
+                )
+        
         # Overall number of pitches
-        pitch_counts['PITCHES'] = (
-                pitch_counts['BALLS_CT'] + pitch_counts['STRIKES_CT'])
-
+        pitch_counts['PITCHES'] = pitch_counts['BALLS_CT'] + pitch_counts['STRIKES_CT']
+        
         # Number of balls hit into play, should match BIP column
         pitch_counts['INPLAY_CT'] = pitch_counts.X
-
+        
         # Number of strikes without hit into play
         pitch_counts['STRIKES_CT_WO_PLAY'] = (
                 pitch_counts['PITCHES'] -
                 pitch_counts['BALLS_CT'] -
-                pitch_counts['INPLAY_CT'])
-
+                pitch_counts['INPLAY_CT']
+                )
+        
         # Merge other counts with pitch counts
-        merged = pd.merge(grouped, pitch_counts, on=('GAME_ID', 'PIT_ID'))
-
+        merged = pd.merge(grouped, pitch_counts, on=('PIT_ID', 'AT_BAT'))
+        
         # Calculate SO/PA ratio
         merged['IND_SO_PA'] = merged['SO_CT'] / merged['PA_CT']
-
+        
         # Calculate BB/PA ratio
         merged['IND_BB_PA'] = merged['BB_SUM'] / merged['PA_CT']
-
+        
         # Other ratio
         merged['IND_GB_PA'] = (
                 (merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) /
-                merged['PA_CT'])
-
+                merged['PA_CT']
+                )
+        
         # Other ratio opposite sign + squared
         merged['IND_NEG_GB_PA'] = (
                 ((merged['GB_SUM'] - merged['FB_SUM'] - merged['PU_SUM']) /
-                 merged['PA_CT'])**2)
-
+                 merged['PA_CT'])**2
+                 )
+        
         merged['IND_NEG_GB_PA'] = np.where(
                 merged['IND_GB_PA'] > 0,
                 -merged['IND_NEG_GB_PA'],
-                merged['IND_NEG_GB_PA'])
-
+                merged['IND_NEG_GB_PA']
+                )
+        
         # Calculate individual SIERA
         merged['IND_SIERA'] = SIERA(merged, 'IND')
-
-        # Fix year_id
-        merged['YEAR_ID'] = pd.to_numeric(merged.GAME_ID.str[3:7])
-
-        # Merge for FIP constant
-        merged_FIP = pd.merge(merged, fip_constant, on='YEAR_ID')
-
-        # Calculate Innings Pitched
-        merged['IND_IP'] = merged['EVENT_OUTS_CT'] / 3
-
-        # Calculate FIP
-        merged['IND_FIP'] = (
-                ((13*merged['HR_CT'] + 3*(merged['BB_SUM'] +
-                  merged['HP_SUM']) - 2*merged['SO_CT']) / (merged['IND_IP']) +
-                    merged_FIP['cFIP']))
-
-        # Drop some columns
-        final_stats = merged.drop('EVENT_CD', 1)
-
-        # Calculate Mean, St.Dev
-        pit_mean = final_stats['IND_SIERA'].mean()
-        pit_stdev = final_stats['IND_SIERA'].std()
-
-        return pit_mean, pit_stdev
+        
+        final_stats = merged[['PIT_ID', 'AT_BAT', 'IND_SIERA']].copy()
+        
+        # Calculate and format mean dataframe
+        pit_mean = final_stats.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).mean()
+        pit_mean = pit_mean.reset_index()
+        pit_mean = pit_mean.set_index('AT_BAT')
+        pit_mean = pit_mean.rename(columns = {'IND_SIERA':'SIERA_MEAN'})
+        
+        # Calculate and format std dev dataframe
+        pit_std = final_stats.set_index(['PIT_ID', 'AT_BAT']).groupby(level=[0,1]).std()
+        pit_std = pit_std.reset_index()
+        pit_std = pit_std.set_index('AT_BAT')
+        pit_std = pit_std.rename(columns = {'IND_SIERA':'SIERA_STD'})
+        pit_std = pit_std.fillna(method='ffill')
+        pit_std = pit_std.drop(['PIT_ID'], axis = 1)
+        
+        # Concatenate datasets
+        pit_mean_std = pd.concat([pit_mean, pit_std], axis=1)
+        
+        # Copy last row until 100 records        
+        fill = 100 - len(pit_mean_std)
+        pit_mean_std = pit_mean_std.append([pit_mean_std.tail(1)]*fill, ignore_index = True)
+        
+        #Add ad_bats column based on index
+        pit_mean_std['AT_BAT'] = pit_mean_std.index + 1
+        
+        
+        return pit_mean_std
